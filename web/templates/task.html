@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Статус обработки видео - Система дубляжа{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h2 class="h4 mb-0">Статус обработки видео</h2>
+            </div>
+            <div class="card-body">
+                <div id="status-container">
+                    <div class="text-center p-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <p class="mt-3">Получение информации о статусе задачи...</p>
+                    </div>
+                </div>
+                
+                <!-- Шаблон для статуса "В очереди" -->
+                <template id="status-queued">
+                    <div class="alert alert-info">
+                        <h4 class="alert-heading">Задача в очереди</h4>
+                        <p>Ваше видео находится в очереди на обработку. Обработка начнется в ближайшее время.</p>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 10%" aria-valuenow="10" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                    <p>Файл: <span class="filename"></span></p>
+                    <p class="text-muted">Эта страница автоматически обновляется. Пожалуйста, не закрывайте ее.</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-primary">Вернуться на главную</a>
+                    </div>
+                </template>
+                
+                <!-- Шаблон для статуса "В процессе" -->
+                <template id="status-processing">
+                    <div class="alert alert-primary">
+                        <h4 class="alert-heading">Обработка видео</h4>
+                        <p>Ваше видео в данный момент обрабатывается. Этот процесс может занять некоторое время в зависимости от длительности видео.</p>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 50%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                    <p>Файл: <span class="filename"></span></p>
+                    <p class="text-muted">Эта страница автоматически обновляется. Пожалуйста, не закрывайте ее.</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-primary">Вернуться на главную</a>
+                    </div>
+                </template>
+                
+                <!-- Шаблон для статуса "Завершено" -->
+                <template id="status-completed">
+                    <div class="alert alert-success">
+                        <h4 class="alert-heading">Обработка завершена!</h4>
+                        <p>Ваше видео успешно обработано. Теперь вы можете скачать результат.</p>
+                    </div>
+                    <p>Исходный файл: <span class="filename"></span></p>
+                    <div class="d-grid gap-2">
+                        <a href="#" class="btn btn-success download-link">Скачать дублированное видео</a>
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-primary">Загрузить другое видео</a>
+                    </div>
+                    <div class="alert alert-warning mt-4">
+                        <p class="mb-0">Обратите внимание: обработанное видео будет храниться на сервере в течение 24 часов, после чего будет автоматически удалено.</p>
+                    </div>
+                </template>
+                
+                <!-- Шаблон для статуса "Ошибка" -->
+                <template id="status-error">
+                    <div class="alert alert-danger">
+                        <h4 class="alert-heading">Произошла ошибка</h4>
+                        <p>К сожалению, при обработке вашего видео произошла ошибка.</p>
+                        <hr>
+                        <p class="mb-0 error-message"></p>
+                    </div>
+                    <p>Файл: <span class="filename"></span></p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('index') }}" class="btn btn-primary">Попробовать снова</a>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const taskId = '{{ task_id }}';
+        const statusContainer = document.getElementById('status-container');
+        const templates = {
+            queued: document.getElementById('status-queued'),
+            processing: document.getElementById('status-processing'),
+            completed: document.getElementById('status-completed'),
+            error: document.getElementById('status-error')
+        };
+        
+        // Функция для обновления статуса
+        function updateStatus() {
+            fetch('/api/task/' + taskId)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Не удалось получить информацию о задаче');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Очищаем контейнер
+                    statusContainer.innerHTML = '';
+                    
+                    // Выбираем шаблон в зависимости от статуса
+                    let template;
+                    switch (data.status) {
+                        case 'queued':
+                            template = templates.queued.content.cloneNode(true);
+                            break;
+                        case 'processing':
+                            template = templates.processing.content.cloneNode(true);
+                            break;
+                        case 'completed':
+                            template = templates.completed.content.cloneNode(true);
+                            // Устанавливаем ссылку для скачивания
+                            template.querySelector('.download-link').href = data.download_url;
+                            break;
+                        case 'error':
+                            template = templates.error.content.cloneNode(true);
+                            // Устанавливаем текст ошибки
+                            template.querySelector('.error-message').textContent = data.error || 'Неизвестная ошибка';
+                            break;
+                        default:
+                            template = templates.queued.content.cloneNode(true);
+                    }
+                    
+                    // Устанавливаем имя файла
+                    const filenameElements = template.querySelectorAll('.filename');
+                    filenameElements.forEach(el => {
+                        el.textContent = data.original_filename;
+                    });
+                    
+                    // Добавляем шаблон в контейнер
+                    statusContainer.appendChild(template);
+                    
+                    // Если задача все еще в процессе, продолжаем обновлять статус
+                    if (data.status === 'queued' || data.status === 'processing') {
+                        setTimeout(updateStatus, 3000);
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при получении статуса:', error);
+                    statusContainer.innerHTML = `
+                        <div class="alert alert-danger">
+                            <h4 class="alert-heading">Не удалось получить статус</h4>
+                            <p>${error.message}</p>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" onclick="updateStatus()">Попробовать снова</button>
+                            <a href="{{ url_for('index') }}" class="btn btn-outline-primary">Вернуться на главную</a>
+                        </div>
+                    `;
+                });
+        }
+        
+        // Начинаем обновление статуса
+        updateStatus();
+    });
+</script>
+{% endblock %} 
