@@ -20,5 +20,5 @@ soundfile>=0.13.1  # для работы с аудио файлами
 
 # Переводы и NLP
 googletrans>=4.0.2  # для перевода
-openai>=2.33.0        # для GPT API
-transformers>=5.7.0  # для NLP задач
+openai>=2.36.0        # для GPT API
+transformers>=5.8.0  # для NLP задач
